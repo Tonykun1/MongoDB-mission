@@ -5,7 +5,7 @@ const GlassesSchema = new mongoose.Schema({
 Color: { type: String, required: true },
 Price: { type: Number, required: true },
 IsFragile:{type: Boolean},
-Material:{type:Number },
+Material:{type:String },
 Volume:{type:Number}
 });
 

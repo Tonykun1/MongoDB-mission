@@ -1,80 +1,183 @@
 const express = require('express');
+const readline = require('readline');
+const mongoose = require('mongoose');
+const Glasses = require('../Mudoles/glasses');
+const Table = require('cli-table3'); 
 const router = express.Router();
-let users = [];
-router.get('/', (req, res) => {
-    res.status(200).send('Hello World!')
-  })
-//get all users
-//get all users
-router.get("/test-get", async (req, res) => {
-  try {
-    //await **mongodb find users info here**
-    res.status(200).send(users);
-    console.log(users);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to send users to client", error: err });
-  }
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
 });
 
-//create a new user and id
-router.post("/test-post", async (req, res) => {
-  const { name, id } = req.body;
+async function showData() {
   try {
-    //await **mongodb find user here**
-    const haveID = users.find((user) => user.id === id); //Not needed when fetching from db
-    if (haveID) {
-      console.log("User already exists");
-      return res.status(400).send("User already exists");
-    }
-    const newUser = { id, name };
-    //await **mongodb insertOne user here**
-    users.push(newUser); //Not needed when inserting to db
-    console.log(users);
-    res.status(200).send(users);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to save new user", error: err });
-  }
-});
-  //update a user by id
-  router.put('/test-put/:id', async (req, res) => {
-    const { name } = req.body;
-    const { id } = req.params;
-    try{
-    let haveID =false;
-    users = users.map(user => {
-        if (user.id == id) {
-          haveID = true;
-            return { ...user, name };
-        }
-        return user;
+    const data = await Glasses.find();
+
+    const table = new Table({
+      head: ['ID', 'Color', 'Price', 'Is Fragile', 'Material', 'Volume'],
+      colWidths: [30, 20, 10, 15, 20, 10], style: {
+        head: ['yellow'],  
+        border: ['grey'],  
+      }, 
     });
-    if(!haveID){
-      console.log('User not found');
-      return res.status(404).send('User not found');
+
+    data.forEach(glass => {
+      table.push([
+        glass._id.toString(),
+        glass.Color,
+        glass.Price,
+        glass.IsFragile ? 'Yes' : 'No',
+        glass.Material,
+        glass.Volume,
+      ]);
+    });
+
+    console.log(table.toString());
+  } catch (err) {
+    console.error('Error fetching data:', err.message);
   }
-    console.log(users);
-    res.status(200).send(users);
-  }
-  catch(err){
-    res.status(500).json({message: 'Failed to update user', error: err});
-  }
+}
+
+async function newData() {
+  rl.question('Enter Glasses Color: ', (Color) => {
+    rl.question('Enter Glasses Price: ', (Price) => {
+      rl.question('Enter Is Fragile (y/n): ', (IsFragile) => {
+        rl.question('Enter Material: ', (Material) => {
+          rl.question('Enter Volume: ', async (Volume) => {
+            try {
+              const priceNumber = parseFloat(Price);
+              const volumeNumber = parseInt(Volume, 10);
+              const isFragileBoolean = IsFragile.toLowerCase() === 'y'; 
+              const newGlasses = new Glasses({
+                Color,
+                Price: priceNumber,
+                IsFragile: isFragileBoolean,
+                Material,
+                Volume: volumeNumber,
+              });
+              await newGlasses.save();
+              console.log('Saved Glasses:');
+              showData().then(() => {
+                startSwitch();
+              });
+            } catch (error) {
+              console.error('Error adding Glasses:', error.message);
+            }
+          });
+        });2
+      });
+    });
+  });
+}
+
+async function updateData() {
+  rl.question('Enter the ID of the Glass to update: ', async (id) => {
+    try {
+      const glass = await Glasses.findById(id);
+
+      if (!glass) {
+        console.log('Glass not found!');
+        showData().then(() => {
+          startSwitch();
+        });
+        return;
+      }
+
+      rl.question(`Enter new Color (current: ${glass.Color}, or type 'n' to keep): `, (Color) => {
+        Color = Color.toLowerCase() === 'n' ? glass.Color : Color;
+
+        rl.question(`Enter new Price (current: ${glass.Price}, or type 'n' to keep): `, (Price) => {
+          Price = Price.toLowerCase() === 'n' ? glass.Price : parseFloat(Price);
+
+          rl.question(`Enter Is Fragile (current: ${glass.IsFragile}, or type 'n' to keep): `, (IsFragile) => {
+            IsFragile = IsFragile.toLowerCase() === 'n' ? glass.IsFragile : (IsFragile.toLowerCase() === 't');
+
+            rl.question(`Enter new Material (current: ${glass.Material}, or type 'n' to keep): `, (Material) => {
+              Material = Material.toLowerCase() === 'n' ? glass.Material : Material;
+
+              rl.question(`Enter new Volume (current: ${glass.Volume}, or type 'n' to keep): `, async (Volume) => {
+                Volume = Volume.toLowerCase() === 'n' ? glass.Volume : parseInt(Volume, 10);
+
+                const updates = {
+                  Color,
+                  Price,
+                  IsFragile,
+                  Material,
+                  Volume,
+                };
+
+                try {
+                  const updatedGlass = await Glasses.findByIdAndUpdate(id, updates, { new: true });
+                  console.log('\nUpdated Glass:');
+                  showData().then(() => {
+                    startSwitch();
+                  });
+                } catch (err) {
+                  console.error('Error updating Glass:', err.message);
+                }
+              });
+            });
+          });
+        });
+      });
+    } catch (err) {
+      console.error('Error finding Glass:', err.message);
+      showData().then(() => {
+        startSwitch();
+      });
+    }
+  });
+}
+
+async function deleteData() {
+  rl.question('Enter the ID of the Glass to delete: ', async (id) => {
+    try {
+      const deletedGlass = await Glasses.findByIdAndDelete(id);
+      if (deletedGlass) {
+        console.log('\nDeleted Glass:');
+        showData().then(() => {
+          startSwitch();
+        });
+      } else {
+        console.log('No Glass found with the given ID.');
+      }
+    } catch (err) {
+      console.error('Error deleting Glass:', err.message);
+    }
+  });
+}
+
+function startSwitch() {
+  rl.question('\nChoose an operation:\n1. Show Data\n2. Add New Data\n3. Update Data\n4. Delete Data\n5. Exit\nYour choice: ',
+    (choice) => {
+      switch (choice) {
+        case '1':
+          showData(); 
+          break;
+        case '2':
+          newData();
+          break;
+        case '3':
+          updateData();
+          break;
+        case '4':
+          deleteData();
+          break;
+        case '5':
+          console.log('Exiting...');
+          rl.close();
+          break;
+        default:
+          console.log('Invalid choice, please try again.');
+          startSwitch();
+      }
+    }
+  );
+}
+
+showData().then(() => {
+  startSwitch();
 });
 
-//delete user by id
-router.delete('/test-delete/:id', async (req, res) => {
-    const { id } = req.params;
-    try{
-    const userID = users.findIndex(user => user.id === id);
-    if (userID === -1) {
-        console.log('User not found');
-        return res.status(404).send('User not found');
-    }
-    users.splice(userID, 1);
-    console.log(users); 
-    res.status(200).send(users);
-  }
-  catch(err){
-    res.status(400).json({message: 'Failed to delete user', error: err});
-  }
-})
 module.exports = router;
