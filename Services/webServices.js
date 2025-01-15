@@ -15,16 +15,17 @@ async function showData() {
     const data = await Glasses.find();
 
     const table = new Table({
-      head: ['ID', 'Color', 'Price', 'Is Fragile', 'Material', 'Volume'],
-      colWidths: [30, 20, 10, 15, 20, 10], style: {
+      head: ['Index', 'Color', 'Price', 'Is Fragile', 'Material', 'Volume'],
+      colWidths: [10, 20, 10, 15, 20, 10],
+      style: {
         head: ['yellow'],  
         border: ['grey'],  
       }, 
     });
 
-    data.forEach(glass => {
+    data.forEach((glass, index) => {
       table.push([
-        glass._id.toString(),
+        index + 1, 
         glass.Color,
         glass.Price,
         glass.IsFragile ? 'Yes' : 'No',
@@ -34,11 +35,11 @@ async function showData() {
     });
 
     console.log(table.toString());
+    return data; 
   } catch (err) {
     console.error('Error fetching data:', err.message);
   }
 }
-
 async function newData() {
   rl.question('Enter Glasses Color: ', (Color) => {
     rl.question('Enter Glasses Price: ', (Price) => {
@@ -70,14 +71,15 @@ async function newData() {
     });
   });
 }
-
 async function updateData() {
-  rl.question('Enter the ID of the Glass to update: ', async (id) => {
-    try {
-      const glass = await Glasses.findById(id);
+  try {
+    const data = await showData(); 
+    rl.question('Enter the Index of the Glass to update: ', async (indexInput) => {
+      const index = parseInt(indexInput, 10) - 1;
+      const glass = data[index];
 
       if (!glass) {
-        console.log('Glass not found!');
+        console.log('Invalid index. Please try again.');
         showData().then(() => {
           startSwitch();
         });
@@ -91,7 +93,7 @@ async function updateData() {
           Price = Price.toLowerCase() === 'n' ? glass.Price : parseFloat(Price);
 
           rl.question(`Enter Is Fragile (current: ${glass.IsFragile}, or type 'n' to keep): `, (IsFragile) => {
-            IsFragile = IsFragile.toLowerCase() === 'n' ? glass.IsFragile : (IsFragile.toLowerCase() === 't');
+            IsFragile = IsFragile.toLowerCase() === 'n' ? glass.IsFragile : IsFragile.toLowerCase() === 'y';
 
             rl.question(`Enter new Material (current: ${glass.Material}, or type 'n' to keep): `, (Material) => {
               Material = Material.toLowerCase() === 'n' ? glass.Material : Material;
@@ -108,48 +110,68 @@ async function updateData() {
                 };
 
                 try {
-                  const updatedGlass = await Glasses.findByIdAndUpdate(id, updates, { new: true });
+                  const updatedGlass = await Glasses.findByIdAndUpdate(glass._id, updates, { new: true });
                   console.log('\nUpdated Glass:');
                   showData().then(() => {
                     startSwitch();
                   });
                 } catch (err) {
                   console.error('Error updating Glass:', err.message);
+                  showData().then(() => {
+                    startSwitch();
+                  });
                 }
               });
             });
           });
         });
       });
-    } catch (err) {
-      console.error('Error finding Glass:', err.message);
-      showData().then(() => {
-        startSwitch();
-      });
-    }
-  });
+    });
+  } catch (err) {
+    console.error('Error showing data:', err.message);
+  }
 }
 
 async function deleteData() {
-  rl.question('Enter the ID of the Glass to delete: ', async (id) => {
-    try {
-      const deletedGlass = await Glasses.findByIdAndDelete(id);
-      if (deletedGlass) {
-        console.log('\nDeleted Glass:');
+  try {
+    const data = await showData(); 
+    rl.question('Enter the Index of the Glass to delete: ', async (indexInput) => {
+      const index = parseInt(indexInput, 10) - 1; 
+      const glass = data[index];
+
+      if (!glass) {
+        console.log('Invalid index. Please try again.');
         showData().then(() => {
           startSwitch();
         });
-      } else {
-        console.log('No Glass found with the given ID.');
+        return;
       }
-    } catch (err) {
-      console.error('Error deleting Glass:', err.message);
-    }
-  });
+
+      try {
+        const deletedGlass = await Glasses.findByIdAndDelete(glass._id);
+        if (deletedGlass) {
+          console.log('\nDeleted Glass:');
+        } else {
+          console.log('No Glass found with the given index.');
+        }
+        showData().then(() => {
+          startSwitch();
+        });
+      } catch (err) {
+        console.error('Error deleting Glass:', err.message);
+        showData().then(() => {
+          startSwitch();
+        });
+      }
+    });
+  } catch (err) {
+    console.error('Error showing data:', err.message);
+  }
 }
 
+
 function startSwitch() {
-  rl.question('\nChoose an operation:\n1. Show Data\n2. Add New Data\n3. Update Data\n4. Delete Data\n5. Exit\nYour choice: ',
+  rl.question('\nChoose an operation:\n1. Show Data\n2. Add New Data\n3. Update Data\n4. Delete Data\nYour choice: ',
     (choice) => {
       switch (choice) {
         case '1':
@@ -163,10 +185,6 @@ function startSwitch() {
           break;
         case '4':
           deleteData();
-          break;
-        case '5':
-          console.log('Exiting...');
-          rl.close();
           break;
         default:
           console.log('Invalid choice, please try again.');
