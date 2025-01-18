@@ -22,7 +22,6 @@ async function showData() {
         border: ['grey'],  
       }, 
     });
-
     data.forEach((glass, index) => {
       table.push([
         index + 1, 
@@ -32,7 +31,9 @@ async function showData() {
         glass.Material,
         glass.Volume,
       ]);
-    });
+    }
+    
+  );
 
     console.log(table.toString());
     return data; 
@@ -47,8 +48,8 @@ async function newData() {
         rl.question('Enter Material: ', (Material) => {
           rl.question('Enter Volume: ', async (Volume) => {
             try {
-              const priceNumber = parseFloat(Price);
-              const volumeNumber = parseInt(Volume, 10);
+              const priceNumber =Price;
+              const volumeNumber = Volume;
               const isFragileBoolean = IsFragile.toLowerCase() === 'y'; 
               const newGlasses = new Glasses({
                 Color,
@@ -75,7 +76,7 @@ async function updateData() {
   try {
     const data = await showData(); 
     rl.question('Enter the Index of the Glass to update: ', async (indexInput) => {
-      const index = parseInt(indexInput, 10) - 1;
+      const index = indexInput - 1;
       const glass = data[index];
 
       if (!glass) {
@@ -90,7 +91,7 @@ async function updateData() {
         Color = Color.toLowerCase() === 'n' ? glass.Color : Color;
 
         rl.question(`Enter new Price (current: ${glass.Price}, or type 'n' to keep): `, (Price) => {
-          Price = Price.toLowerCase() === 'n' ? glass.Price : parseFloat(Price);
+          Price = Price.toLowerCase() === 'n' ? glass.Price : Price;
 
           rl.question(`Enter Is Fragile (current: ${glass.IsFragile}, or type 'n' to keep): `, (IsFragile) => {
             IsFragile = IsFragile.toLowerCase() === 'n' ? glass.IsFragile : IsFragile.toLowerCase() === 'y';
@@ -99,8 +100,21 @@ async function updateData() {
               Material = Material.toLowerCase() === 'n' ? glass.Material : Material;
 
               rl.question(`Enter new Volume (current: ${glass.Volume}, or type 'n' to keep): `, async (Volume) => {
-                Volume = Volume.toLowerCase() === 'n' ? glass.Volume : parseInt(Volume, 10);
+                Volume = Volume.toLowerCase() === 'n' ? glass.Volume : Volume;
+                const isUnchanged =
+                  Color === glass.Color &&
+                  Price === glass.Price &&
+                  IsFragile === glass.IsFragile &&
+                  Material === glass.Material &&
+                  Volume === glass.Volume;
 
+                if (isUnchanged) {
+                  console.log('\nNo changes detected. Update aborted.');
+                  showData().then(() => {
+                    startSwitch();
+                  });
+                  return;
+                }
                 const updates = {
                   Color,
                   Price,
@@ -111,7 +125,7 @@ async function updateData() {
 
                 try {
                   const updatedGlass = await Glasses.findByIdAndUpdate(glass._id, updates, { new: true });
-                  console.log('\nUpdated Glass:');
+                  console.log(`\nUpdated Glass complated at index ${index+1}:`);
                   showData().then(() => {
                     startSwitch();
                   });
@@ -136,7 +150,7 @@ async function deleteData() {
   try {
     const data = await showData(); 
     rl.question('Enter the Index of the Glass to delete: ', async (indexInput) => {
-      const index = parseInt(indexInput, 10) - 1; 
+      const index = indexInput - 1; 
       const glass = data[index];
 
       if (!glass) {
@@ -150,7 +164,7 @@ async function deleteData() {
       try {
         const deletedGlass = await Glasses.findByIdAndDelete(glass._id);
         if (deletedGlass) {
-          console.log('\nDeleted Glass:');
+          console.log(`\nDeleted Glass at index ${index+1}:`);
         } else {
           console.log('No Glass found with the given index.');
         }
@@ -170,20 +184,19 @@ async function deleteData() {
 }
 
 
+
+
 function startSwitch() {
-  rl.question('\nChoose an operation:\n1. Show Data\n2. Add New Data\n3. Update Data\n4. Delete Data\nYour choice: ',
+  rl.question('\nChoose an operation:\n1. Add New Data\n2. Update Data\n3. Delete Data\nYour choice: ',
     (choice) => {
       switch (choice) {
         case '1':
-          showData(); 
-          break;
-        case '2':
           newData();
           break;
-        case '3':
+        case '2':
           updateData();
           break;
-        case '4':
+        case '3':
           deleteData();
           break;
         default:
